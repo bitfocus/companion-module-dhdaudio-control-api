@@ -1,0 +1,26 @@
+{
+	"id": "dhd-control-api",
+	"name": "DHD Control API",
+	"shortname": "control-api",
+	"description": "A short one line description of your module",
+	"version": "0.1.0",
+	"license": "MIT",
+	"repository": "git+https://github.com/bitfocus/companion-module-your-module-name.git",
+	"bugs": "https://github.com/bitfocus/companion-module-your-module-name/issues",
+	"maintainers": [
+		{
+			"name": "Your name",
+			"email": "Your email"
+		}
+	],
+	"runtime": {
+		"type": "node22",
+		"api": "nodejs-ipc",
+		"apiVersion": "0.0.0",
+		"entrypoint": "../dist/main.js"
+	},
+	"legacyIds": [],
+	"manufacturer": "DHD",
+	"products": ["Control API"],
+	"keywords": ["audio", "control-api", "dhd"]
+}

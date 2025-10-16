@@ -1,16 +1,16 @@
 {
-	"id": "dhd-control-api",
-	"name": "DHD Control API",
-	"shortname": "control-api",
-	"description": "A short one line description of your module",
-	"version": "0.1.0",
+	"id": "dhdaudio-control-api",
+	"name": "DHD Audio Control API",
+	"shortname": "Control API",
+	"description": "Connect to modern DHD Series 52 IP Core devices (XC3/XD3/XS3 or RM1)",
+	"version": "1.0.1",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-your-module-name.git",
-	"bugs": "https://github.com/bitfocus/companion-module-your-module-name/issues",
+	"repository": "git+https://github.com/bitfocus/companion-module-dhdaudio-control-api.git",
+	"bugs": "https://github.com/bitfocus/companion-module-dhdaudio-control-api/issues",
 	"maintainers": [
 		{
-			"name": "Your name",
-			"email": "Your email"
+			"name": "DHD audio GmbH",
+			"email": "dhd@dhd-audio.de"
 		}
 	],
 	"runtime": {

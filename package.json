@@ -1,6 +1,6 @@
 {
-  "name": "companion-module-control-api",
-  "version": "1.0.0",
+  "name": "dhdaudio-control-api",
+  "version": "1.0.1",
   "main": "dist/main.js",
   "type": "module",
   "scripts": {
@@ -18,10 +18,10 @@
   "homepage": "https://developer.dhd.audio/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dhd-audio/companion-module-control-api.git"
+    "url": "https://github.com/bitfocus/companion-module-dhdaudio-control-api.git"
   },
   "bugs": {
-    "url": "https://github.com/dhd-audio/companion-module-control-api/issues",
+    "url": "https://github.com/bitfocus/companion-module-dhdaudio-control-api/issues",
     "email": "dhd@dhd-audio.de"
   },
   "engines": {

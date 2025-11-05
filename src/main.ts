@@ -97,6 +97,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			...channelOnOffConfig.variables,
 			...faderPflConfig.variables,
 			...selectorConfig.variables,
+			...snapshotConfig.variables,
 			...logicsConfig.variables,
 			...genericActionConfig.variables,
 		])
@@ -134,6 +135,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		channelOnOff.onSubscriptionUpdate(this, update)
 		selector.onSubscriptionUpdate(this, update)
 		faderPfl.onSubscriptionUpdate(this, update)
+		snapshot.onSubscriptionUpdate(this, update)
 		logics.onSubscriptionUpdate(this, update)
 		genericAction.onSubscriptionUpdate(this, update)
 	}

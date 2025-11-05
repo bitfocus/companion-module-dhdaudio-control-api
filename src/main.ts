@@ -61,7 +61,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 				let websocket: WebsocketApiWithSubscription
 
 				try {
-					let control = new ControlApi({ host: config.host!, useHttps: config.useHttps })
+					let control = new ControlApi({ host: config.host, useHttps: config.useHttps })
 					if (config.token) {
 						control = control.withAuth({ token: config.token }, console.log, console.error)
 					}
@@ -160,7 +160,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 
 				const selectorConfig = await selector.init(this)
 				this.assertCurrentAttempt(attemptId)
-				const snapshotConfig = await snapshot.init(this)
+				const snapshotConfig = await snapshot.init(this, channels ?? {})
 				this.assertCurrentAttempt(attemptId)
 				const logicsConfig = await logics.init(this)
 				this.assertCurrentAttempt(attemptId)

@@ -28,7 +28,7 @@ export function genConfigFields(): SomeCompanionConfigField[] {
 			id: 'token',
 			label: 'API Token',
 			width: 12,
-			regex: Regex.SOMETHING,
+			regex: '/^[a-z0-9-]*$/i',
 		},
 		{
 			type: 'textinput',

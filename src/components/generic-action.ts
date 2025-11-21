@@ -16,10 +16,9 @@ export function init(self: ModuleInstance): {
 }
 
 // to parse the subscription updates coming from the websocket
-// we need to know the path of the subscription
+// we need to know the paths of the subscriptions and corresponding generic variables
 // -- hacky solution
-let subscriptionPath = ''
-let genericVariableName = ''
+const genericVariableNames: any = {}
 
 function genVariables(quantity: number): ReadonlyArray<CompanionVariableDefinition> {
 	return Array.from(
@@ -57,11 +56,18 @@ function genActions(self: ModuleInstance, quantity: number): CompanionActionDefi
 					default: false,
 				},
 				{
+					id: 'toggle',
+					type: 'checkbox',
+					label: 'Toggle',
+					tooltip: 'Can be used to toggle the boolean values, e.g. /audio/mixers/0/faders/0/pfl1',
+					default: false,
+				},
+				{
 					id: 'value',
 					type: 'textinput',
 					label: 'Value',
 					default: '',
-					isVisibleExpression: `$(options:readonly) == false`,
+					isVisibleExpression: `$(options:readonly) == false && $(options:toggle) == false`,
 				},
 				{
 					id: 'variable',
@@ -82,28 +88,40 @@ function genActions(self: ModuleInstance, quantity: number): CompanionActionDefi
 				},
 			],
 			callback: async ({ options }) => {
-				const { path, value, readonly, variable } = options
+				const { path, readonly, toggle, variable } = options
+				let { value } = options
+
 				if (readonly) {
 					return
 				}
 
-				if (!path || !value || !variable) {
+				if (toggle) {
+					if (!variable) {
+						self.log('error', 'generic variable is missing')
+						self.updateStatus(InstanceStatus.BadConfig, 'generic variable must be defined for a toggle option')
+						return
+					}
+
+					value = self.getVariableValue(`generic-action-${variable}`)
+				}
+
+				if (!path || !variable || (!value && !toggle)) {
 					self.log('error', 'option is missing')
 					self.updateStatus(InstanceStatus.BadConfig, 'options is missing')
 					return
 				}
 
-				const parsed = await mixedSchema.parseAsync(value)
+				const parsed = toggle ? !value : await mixedSchema.parseAsync(value)
 
 				self.websocket.set(
 					path.toString(),
 					parsed,
 					(response) => {
-						if (options.variable === 'none') {
+						if (variable === 'none') {
 							return
 						}
 
-						self.setVariableValues({ [`generic-action-${options.variable}`]: response.payload as any })
+						self.setVariableValues({ [`generic-action-${variable}`]: response.payload as any })
 						self.checkFeedbacks()
 					},
 					(response) => {
@@ -119,19 +137,18 @@ function genActions(self: ModuleInstance, quantity: number): CompanionActionDefi
 					return
 				}
 
-				subscriptionPath = path.toString()
+				const subscriptionPath = path.toString()
 				self.websocket.subscribe(path.toString())
 
 				self.websocket.get(
 					path.toString(),
 					(response) => {
-						if (options.variable === 'none') {
-							genericVariableName = ''
+						if (variable === 'none') {
+							genericVariableNames[subscriptionPath] = ''
 							return
 						}
-
-						genericVariableName = `generic-action-${options.variable}`
-						self.setVariableValues({ [`generic-action-${options.variable}`]: response.payload as any })
+						genericVariableNames[subscriptionPath] = `generic-action-${variable}`
+						self.setVariableValues({ [`generic-action-${variable}`]: response.payload as any })
 						self.checkFeedbacks()
 					},
 					(response) => {
@@ -144,28 +161,31 @@ function genActions(self: ModuleInstance, quantity: number): CompanionActionDefi
 }
 
 export function onSubscriptionUpdate(self: ModuleInstance, { payload }: ResponseSubscriptionUpdate): void {
-	// no variable selected
-	if (genericVariableName === '') {
-		return
+	for (const [subscriptionPath, genericVariableName] of Object.entries(genericVariableNames)) {
+		// no variable selected
+		if (genericVariableName === '') {
+			continue
+		}
+
+		// transform subscription path into path array
+		const path = subscriptionPath
+			.split('/')
+			.filter(Boolean) // Remove empty strings from leading slash
+			.map((segment) => {
+				const num = Number(segment)
+				return !isNaN(num) && segment !== '' ? num : segment
+			})
+
+		// remeda needs to know the path upfront which is not possible
+		// with the subscription path
+		// @ts-expect-error
+		const value = prop(payload, ...path)
+		if (value === undefined) {
+			continue
+		}
+
+		self.setVariableValues({ [`${genericVariableName}`]: value })
 	}
 
-	// transform subscription path into path array
-	const path = subscriptionPath
-		.split('/')
-		.filter(Boolean) // Remove empty strings from leading slash
-		.map((segment) => {
-			const num = Number(segment)
-			return !isNaN(num) && segment !== '' ? num : segment
-		})
-
-	// remeda needs to know the path upfront which is not possible
-	// with the subscription path
-	// @ts-expect-error
-	const value = prop(payload, ...path)
-	if (value === undefined) {
-		return
-	}
-
-	self.setVariableValues({ [`${genericVariableName}`]: value })
 	self.checkFeedbacks()
 }

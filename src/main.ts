@@ -89,7 +89,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		const faderLevelConfig = faderLevel.init(this, ch)
 		const faderPflConfig = faderPfl.init(this, ch)
 		const selectorConfig = await selector.init(this)
-		const snapshotConfig = await snapshot.init(this)
+		const snapshotConfig = await snapshot.init(this, ch)
 		const logicsConfig = await logics.init(this)
 		const genericActionConfig = genericAction.init(this)
 

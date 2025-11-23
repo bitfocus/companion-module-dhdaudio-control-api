@@ -89,7 +89,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		const faderLevelConfig = faderLevel.init(this, ch)
 		const faderPflConfig = faderPfl.init(this, ch)
 		const selectorConfig = await selector.init(this)
-		const snapshotConfig = await snapshot.init(this)
+		const snapshotConfig = await snapshot.init(this, ch)
 		const logicsConfig = await logics.init(this)
 		const genericActionConfig = genericAction.init(this)
 
@@ -97,6 +97,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			...channelOnOffConfig.variables,
 			...faderPflConfig.variables,
 			...selectorConfig.variables,
+			...snapshotConfig.variables,
 			...logicsConfig.variables,
 			...genericActionConfig.variables,
 		])
@@ -130,10 +131,11 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	}
 
 	onSubscriptionUpdate(update: ResponseSubscriptionUpdate): void {
-		console.log(update)
+		this.log('debug', JSON.stringify(update))
 		channelOnOff.onSubscriptionUpdate(this, update)
 		selector.onSubscriptionUpdate(this, update)
 		faderPfl.onSubscriptionUpdate(this, update)
+		snapshot.onSubscriptionUpdate(this, update)
 		logics.onSubscriptionUpdate(this, update)
 		genericAction.onSubscriptionUpdate(this, update)
 	}

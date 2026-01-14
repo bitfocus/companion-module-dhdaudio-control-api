@@ -130,7 +130,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	}
 
 	onSubscriptionUpdate(update: ResponseSubscriptionUpdate): void {
-		console.log(update)
+		this.log('debug', JSON.stringify(update))
 		channelOnOff.onSubscriptionUpdate(this, update)
 		selector.onSubscriptionUpdate(this, update)
 		faderPfl.onSubscriptionUpdate(this, update)

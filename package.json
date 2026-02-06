@@ -29,7 +29,7 @@
     "yarn": "^4"
   },
   "dependencies": {
-    "@companion-module/base": "~1.12.1",
+    "@companion-module/base": "~1.14.1",
     "@dhdaudio/control-api": "^1.0.3",
     "remeda": "^2.33.5",
     "zod": "^4.3.6"

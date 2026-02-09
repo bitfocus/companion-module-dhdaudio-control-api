@@ -19,7 +19,7 @@ const ResponseSuccess = z.object({
 	path: z.string(),
 
 	success: z.literal(true),
-	payload: ChannelRecord,
+	payload: z.object({ faders: ChannelRecord }),
 })
 
 const ResponseError = z.object({
@@ -38,17 +38,17 @@ const Response = z.union([ResponseSuccess, ResponseError])
 
 export async function fetchChannel(self: ModuleInstance): Promise<ChannelRecord> {
 	return new Promise((resolve, reject) => {
-		self.websocket.get('/audio/mixers/0/faders', (response) => {
-			// TODO: can `success` false here too? if so the control-api-ts typing need a correction
-			const parsed = z.parse(Response, response)
-			if (parsed.success) {
-				const { payload } = parsed
-
-				return resolve(payload)
+		self.websocket.get('/audio/mixers/0', (response) => {
+			const result = z.safeParse(Response, response)
+			if (!result.success) {
+				return reject(new Error(result.error.message))
 			}
 
-			console.error(parsed.error)
-			reject(new Error(parsed.error.message))
+			if (!result.data.success) {
+				return reject(new Error(result.data.error.message))
+			}
+
+			return resolve(result.data.payload.faders)
 		})
 	})
 }

@@ -1,4 +1,13 @@
-import { InstanceBase, runEntrypoint, InstanceStatus, SomeCompanionConfigField } from '@companion-module/base'
+import {
+	InstanceBase,
+	runEntrypoint,
+	InstanceStatus,
+	type SomeCompanionConfigField,
+	type CompanionVariableDefinition,
+	type CompanionFeedbackDefinitions,
+	type CompanionActionDefinitions,
+	type CompanionPresetDefinitions,
+} from '@companion-module/base'
 import { genConfigFields, type ModuleConfig } from './config.js'
 import { UpgradeScripts } from './upgrades.js'
 import { ControlApi, ResponseSubscriptionUpdate, WebsocketApiWithSubscription } from '@dhdaudio/control-api'
@@ -83,34 +92,50 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			return
 		}
 
-		const ch = await fetchChannel(this)
+		const varDefinitions: Array<CompanionVariableDefinition> = []
+		let feedbackDefinitions: CompanionFeedbackDefinitions = {}
+		let actionDefinitions: CompanionActionDefinitions = {}
+		let presetDefinitions: CompanionPresetDefinitions = {}
 
-		const channelOnOffConfig = channelOnOff.init(this, ch)
-		const faderLevelConfig = faderLevel.init(this, ch)
-		const faderPflConfig = faderPfl.init(this, ch)
+		const channels = await fetchChannel(this).catch(() => null)
+
+		if (channels) {
+			const channelOnOffConfig = channelOnOff.init(this, channels)
+			varDefinitions.push(...channelOnOffConfig.variables)
+			feedbackDefinitions = { ...feedbackDefinitions, ...channelOnOffConfig.feedback }
+			actionDefinitions = { ...actionDefinitions, ...channelOnOffConfig.actions }
+			presetDefinitions = { ...presetDefinitions, ...channelOnOffConfig.presets }
+
+			const faderLevelConfig = faderLevel.init(this, channels)
+			actionDefinitions = { ...actionDefinitions, ...faderLevelConfig.actions }
+			presetDefinitions = { ...presetDefinitions, ...faderLevelConfig.presets }
+
+			const faderPflConfig = faderPfl.init(this, channels)
+			varDefinitions.push(...faderPflConfig.variables)
+			feedbackDefinitions = { ...feedbackDefinitions, ...faderPflConfig.feedback }
+			actionDefinitions = { ...actionDefinitions, ...faderPflConfig.actions }
+			presetDefinitions = { ...presetDefinitions, ...faderPflConfig.presets }
+		}
+
 		const selectorConfig = await selector.init(this)
 		const snapshotConfig = await snapshot.init(this)
 		const logicsConfig = await logics.init(this)
 		const genericActionConfig = genericAction.init(this)
 
 		this.setVariableDefinitions([
-			...channelOnOffConfig.variables,
-			...faderPflConfig.variables,
+			...varDefinitions,
 			...selectorConfig.variables,
 			...logicsConfig.variables,
 			...genericActionConfig.variables,
 		])
 
 		this.setFeedbackDefinitions({
-			...channelOnOffConfig.feedback,
-			...faderPflConfig.feedback,
+			...feedbackDefinitions,
 			...selectorConfig.feedback,
 			...logicsConfig.feedback,
 		})
 		this.setActionDefinitions({
-			...channelOnOffConfig.actions,
-			...faderLevelConfig.actions,
-			...faderPflConfig.actions,
+			...actionDefinitions,
 			...selectorConfig.actions,
 			...snapshotConfig.actions,
 			...logicsConfig.actions,
@@ -118,9 +143,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		})
 
 		this.setPresetDefinitions({
-			...channelOnOffConfig.presets,
-			...faderLevelConfig.presets,
-			...faderPflConfig.presets,
+			...presetDefinitions,
 			...selectorConfig.presets,
 			...snapshotConfig.presets,
 			...logicsConfig.presets,

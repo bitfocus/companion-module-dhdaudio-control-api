@@ -82,7 +82,7 @@ function genActions(self: ModuleInstance, logics: Logics): CompanionActionDefini
 				{
 					id: 'logicId',
 					type: 'dropdown',
-					label: 'Fader',
+					label: 'Logic',
 					default: Object.keys(logics)[0],
 					choices: Object.entries(logics).map(([id, values]) => ({ id, label: `${id} (${values._name})` })),
 				},

@@ -8,11 +8,11 @@ Returns actions, feedbacks, variables, and/or presets:
 
 ```typescript
 export function init(self: ModuleInstance): {
-    variables: ReadonlyArray<CompanionVariableDefinition>
-    actions: CompanionActionDefinitions
+	variables: ReadonlyArray<CompanionVariableDefinition>
+	actions: CompanionActionDefinitions
 } {
-    // ...
-    return { variables, actions }
+	// ...
+	return { variables, actions }
 }
 ```
 
@@ -21,11 +21,8 @@ export function init(self: ModuleInstance): {
 Handles websocket updates from DHD Control API:
 
 ```typescript
-export function onSubscriptionUpdate(
-    self: ModuleInstance,
-    { payload }: ResponseSubscriptionUpdate
-): void {
-    // Handle updates
+export function onSubscriptionUpdate(self: ModuleInstance, { payload }: ResponseSubscriptionUpdate): void {
+	// Handle updates
 }
 ```
 

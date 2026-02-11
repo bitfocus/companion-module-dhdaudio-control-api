@@ -3,7 +3,7 @@
 	"name": "DHD Audio Control API",
 	"shortname": "Control API",
 	"description": "Connect to modern DHD Series 52 IP Core devices (XC3/XD3/XS3 or RM1)",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-dhdaudio-control-api.git",
 	"bugs": "https://github.com/bitfocus/companion-module-dhdaudio-control-api/issues",

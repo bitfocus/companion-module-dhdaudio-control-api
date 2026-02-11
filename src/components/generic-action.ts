@@ -138,7 +138,7 @@ function genActions(self: ModuleInstance, quantity: number): CompanionActionDefi
 				}
 
 				const subscriptionPath = path.toString()
-				self.websocket.subscribe(path.toString())
+				self.websocket.subscribe(subscriptionPath)
 
 				self.websocket.get(
 					path.toString(),

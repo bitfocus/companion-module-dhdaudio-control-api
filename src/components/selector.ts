@@ -254,6 +254,30 @@ function genFeedbacks(
 					JSON.stringify({ left: source._sourcel, right: source._sourcer })
 				)
 			},
+
+			subscribe: ({ options }) => {
+				const source = find(options)
+				if (!source) {
+					return
+				}
+
+				self.websocket.subscribe(`/audio/selectors/selectors/${options.selectorId}`)
+
+				self.websocket.get(
+					`/audio/selectors/selectors/${options.selectorId}`,
+					(response) => {
+						const value = selector.parse(response.payload)
+
+						self.setVariableValues({
+							[`routing_${options.selectorId}`]: JSON.stringify({ left: value.left, right: value.right }),
+						})
+						self.checkFeedbacks()
+					},
+					(response) => {
+						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
+					},
+				)
+			},
 		},
 	}
 }

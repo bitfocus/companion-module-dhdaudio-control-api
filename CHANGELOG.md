@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Companion buttons now correctly reflect logic state changes on feedbacks (fix for [#10](https://github.com/bitfocus/companion-module-dhdaudio-control-api/issues/10)).
 - Prevented an error when no fader channel is configured by skipping channel and fader definition setup until channel data is available (fix for [#9](https://github.com/bitfocus/companion-module-dhdaudio-control-api/issues/9)).
 - Relaxed API token validation to accept the alphanumeric-and-dash format used by DHD Control API tokens.
+- Added feedback subscriptions and initial state fetches for channel on/off, PFL, and selector routing so button states stay accurate immediately and during runtime updates.
 
 ### Changed
 

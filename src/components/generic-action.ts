@@ -18,7 +18,7 @@ export function init(self: ModuleInstance): {
 // to parse the subscription updates coming from the websocket
 // we need to know the paths of the subscriptions and corresponding generic variables
 // -- hacky solution
-const genericVariableNames: any = {}
+const genericVariableNames: Record<string, string> = {}
 
 function genVariables(quantity: number): ReadonlyArray<CompanionVariableDefinition> {
 	return Array.from(

@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pot support now only includes entries that provide `value`, `_min`, and `_max`, and pot rotary adjustments are clamped to each pot's configured minimum/maximum range.
 
+### Fixed
+
+- Generic actions now keep variable-to-path mappings per subscription, update all related feedback states on subscription events, and support key-press toggling for boolean paths (from [#3](https://github.com/bitfocus/companion-module-dhdaudio-control-api/pull/3)).
+
 ## [1.0.3] - 2026-02-11
 
 ### Fixed

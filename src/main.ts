@@ -13,9 +13,12 @@ import { UpgradeScripts } from './upgrades.js'
 import { ControlApi, ResponseSubscriptionUpdate, WebsocketApiWithSubscription } from '@dhdaudio/control-api'
 import * as z from 'zod'
 import { fetchChannel } from './control-api/channel.js'
+import { fetchPots } from './control-api/pots.js'
 import * as channelOnOff from './components/channel-on-off.js'
 import * as faderLevel from './components/fader-level.js'
+import * as faderGainAgain from './components/fader-gain-again.js'
 import * as faderPfl from './components/fader-pfl.js'
+import * as potValue from './components/pot-value.js'
 import * as selector from './components/selector.js'
 import * as snapshot from './components/snapshot.js'
 import * as logics from './components/logics.js'
@@ -98,6 +101,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		let presetDefinitions: CompanionPresetDefinitions = {}
 
 		const channels = await fetchChannel(this).catch(() => null)
+		const pots = await fetchPots(this).catch(() => null)
 
 		if (channels) {
 			const channelOnOffConfig = channelOnOff.init(this, channels)
@@ -110,11 +114,21 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			actionDefinitions = { ...actionDefinitions, ...faderLevelConfig.actions }
 			presetDefinitions = { ...presetDefinitions, ...faderLevelConfig.presets }
 
+			const faderGainAgainConfig = faderGainAgain.init(this, channels)
+			actionDefinitions = { ...actionDefinitions, ...faderGainAgainConfig.actions }
+			presetDefinitions = { ...presetDefinitions, ...faderGainAgainConfig.presets }
+
 			const faderPflConfig = faderPfl.init(this, channels)
 			varDefinitions.push(...faderPflConfig.variables)
 			feedbackDefinitions = { ...feedbackDefinitions, ...faderPflConfig.feedback }
 			actionDefinitions = { ...actionDefinitions, ...faderPflConfig.actions }
 			presetDefinitions = { ...presetDefinitions, ...faderPflConfig.presets }
+		}
+
+		if (pots && Object.keys(pots).length > 0) {
+			const potValueConfig = potValue.init(this, pots)
+			actionDefinitions = { ...actionDefinitions, ...potValueConfig.actions }
+			presetDefinitions = { ...presetDefinitions, ...potValueConfig.presets }
 		}
 
 		const selectorConfig = await selector.init(this)

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added dedicated rotary actions and presets for fader gain trim (`/audio/mixers/{mixerID}/faders/{faderID}/params/gain/again/`) and pot values (`/audio/pots/{potID}/value`).
+
+### Changed
+
+- Pot support now only includes entries that provide `value`, `_min`, and `_max`, and pot rotary adjustments are clamped to each pot's configured minimum/maximum range.
+
 ## [1.0.3] - 2026-02-11
 
 ### Fixed

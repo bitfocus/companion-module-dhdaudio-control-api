@@ -58,6 +58,20 @@ function genFeedbacks(self: ModuleInstance, ch: ChannelRecord): CompanionFeedbac
 				},
 			],
 			callback: ({ options }) => !!self.getVariableValue(`channel_fader_${options.faderId}`) === true,
+			subscribe: ({ options }) => {
+				self.websocket.subscribe(`/audio/mixers/0/faders/${options.faderId}/on`)
+				self.websocket.get(
+					`/audio/mixers/0/faders/${options.faderId}/on`,
+					(response) => {
+						const nextValue = z.boolean().parse(response.payload)
+						self.setVariableValues({ [`channel_fader_${options.faderId}`]: nextValue })
+						self.checkFeedbacks()
+					},
+					(response) => {
+						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
+					},
+				)
+			},
 		},
 	}
 }

@@ -70,6 +70,21 @@ function genFeedbacks(self: ModuleInstance, logics: Logics): CompanionFeedbackDe
 				},
 			],
 			callback: ({ options }) => self.getVariableValue(`logic_${options.logicId}`) === true,
+			subscribe: ({ options }) => {
+				self.websocket.subscribe(`/control/logics/${options.logicId}/value`)
+
+				self.websocket.get(
+					`/control/logics/${options.logicId}/value`,
+					(response) => {
+						const value = z.boolean().parse(response.payload)
+						self.setVariableValues({ [`logic_${options.logicId}`]: value })
+						self.checkFeedbacks()
+					},
+					(response) => {
+						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
+					},
+				)
+			},
 		},
 	}
 }
@@ -82,7 +97,7 @@ function genActions(self: ModuleInstance, logics: Logics): CompanionActionDefini
 				{
 					id: 'logicId',
 					type: 'dropdown',
-					label: 'Fader',
+					label: 'Logic',
 					default: Object.keys(logics)[0],
 					choices: Object.entries(logics).map(([id, values]) => ({ id, label: `${id} (${values._name})` })),
 				},

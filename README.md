@@ -2,7 +2,7 @@
 
 ## User Documentation
 
-See [HELP.md](./companion/HELP.md) 
+See [HELP.md](./companion/HELP.md)
 
 ## Getting started
 

@@ -24,10 +24,21 @@ import * as snapshot from './components/snapshot.js'
 import * as logics from './components/logics.js'
 import * as genericAction from './components/generic-action.js'
 
+const CONNECTION_TIMEOUT_MS = 5000
+
+class StaleAttemptError extends Error {
+	constructor() {
+		super('Stale init attempt')
+		this.name = 'StaleAttemptError'
+	}
+}
+
 export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	config!: ModuleConfig
 
 	websocket!: WebsocketApiWithSubscription
+
+	private latestInitAttempt = 0
 
 	constructor(internal: unknown) {
 		super(internal)
@@ -37,133 +48,155 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		this.config = config
 
 		if (!this.config.host) {
-			this.updateStatus(InstanceStatus.ConnectionFailure, 'Host not set')
+			this.updateStatus(InstanceStatus.BadConfig, 'Host not set')
 			return
 		}
 
 		this.updateStatus(InstanceStatus.Connecting)
 
-		try {
-			if (this.config.token) {
-				this.websocket = await new ControlApi({ host: this.config.host, useHttps: this.config.useHttps })
-					.withAuth({ token: this.config.token }, console.log, console.error)
-					.withSubscription(this.onSubscriptionUpdate.bind(this))
-					.withLogLevel('error')
-					.connectAsync()
-			} else {
-				this.websocket = await new ControlApi({ host: this.config.host, useHttps: this.config.useHttps })
-					.withSubscription(this.onSubscriptionUpdate.bind(this))
-					.withLogLevel('error')
-					.connectAsync()
-			}
-		} catch (err) {
-			if (err instanceof Error) {
-				this.updateStatus(InstanceStatus.ConnectionFailure, err.message)
-				return
-			}
+		const attemptId = ++this.latestInitAttempt
 
-			// parse as `ResponseAuthError` from control-api package
-			const parserResult = z
-				.object({
-					error: z.object({
-						code: z.number(),
-						message: z.string(),
-					}),
+		void (async () => {
+			try {
+				let websocket: WebsocketApiWithSubscription
+
+				try {
+					let control = new ControlApi({ host: config.host!, useHttps: config.useHttps })
+					if (config.token) {
+						control = control.withAuth({ token: config.token }, console.log, console.error)
+					}
+					control = control.withSubscription(this.onSubscriptionUpdate.bind(this)).withLogLevel('error')
+
+					const connectResult = await this.withTimeout(
+						control.connectAsync(),
+						CONNECTION_TIMEOUT_MS,
+						`Connection timeout after ${CONNECTION_TIMEOUT_MS / 1000}s`,
+					)
+					websocket = connectResult as WebsocketApiWithSubscription
+				} catch (err) {
+					this.assertCurrentAttempt(attemptId)
+
+					if (err instanceof Error) {
+						this.updateStatus(InstanceStatus.ConnectionFailure, err.message)
+						return
+					}
+
+					const parserResult = z
+						.object({
+							error: z.object({
+								code: z.number(),
+								message: z.string(),
+							}),
+						})
+						.safeParse(err)
+
+					if (parserResult.success) {
+						this.updateStatus(InstanceStatus.ConnectionFailure, parserResult.data.error.message)
+						return
+					}
+
+					const parserResult2 = z
+						.object({
+							type: z.string(),
+						})
+						.safeParse(err)
+
+					if (parserResult2.success) {
+						this.updateStatus(InstanceStatus.ConnectionFailure, parserResult2.data.type)
+						return
+					}
+
+					this.updateStatus(InstanceStatus.ConnectionFailure, 'unknow error')
+					return
+				}
+
+				this.assertCurrentAttempt(attemptId)
+				this.websocket = websocket
+
+				const varDefinitions: Array<CompanionVariableDefinition> = []
+				let feedbackDefinitions: CompanionFeedbackDefinitions = {}
+				let actionDefinitions: CompanionActionDefinitions = {}
+				let presetDefinitions: CompanionPresetDefinitions = {}
+
+				const channels = await fetchChannel(this).catch(() => null)
+				this.assertCurrentAttempt(attemptId)
+				const pots = await fetchPots(this).catch(() => null)
+				this.assertCurrentAttempt(attemptId)
+
+				if (channels) {
+					const channelOnOffConfig = channelOnOff.init(this, channels)
+					varDefinitions.push(...channelOnOffConfig.variables)
+					feedbackDefinitions = { ...feedbackDefinitions, ...channelOnOffConfig.feedback }
+					actionDefinitions = { ...actionDefinitions, ...channelOnOffConfig.actions }
+					presetDefinitions = { ...presetDefinitions, ...channelOnOffConfig.presets }
+
+					const faderLevelConfig = faderLevel.init(this, channels)
+					actionDefinitions = { ...actionDefinitions, ...faderLevelConfig.actions }
+					presetDefinitions = { ...presetDefinitions, ...faderLevelConfig.presets }
+
+					const faderGainAgainConfig = faderGainAgain.init(this, channels)
+					actionDefinitions = { ...actionDefinitions, ...faderGainAgainConfig.actions }
+					presetDefinitions = { ...presetDefinitions, ...faderGainAgainConfig.presets }
+
+					const faderPflConfig = faderPfl.init(this, channels)
+					varDefinitions.push(...faderPflConfig.variables)
+					feedbackDefinitions = { ...feedbackDefinitions, ...faderPflConfig.feedback }
+					actionDefinitions = { ...actionDefinitions, ...faderPflConfig.actions }
+					presetDefinitions = { ...presetDefinitions, ...faderPflConfig.presets }
+				}
+
+				if (pots && Object.keys(pots).length > 0) {
+					const potValueConfig = potValue.init(this, pots)
+					actionDefinitions = { ...actionDefinitions, ...potValueConfig.actions }
+					presetDefinitions = { ...presetDefinitions, ...potValueConfig.presets }
+				}
+
+				const selectorConfig = await selector.init(this)
+				this.assertCurrentAttempt(attemptId)
+				const snapshotConfig = await snapshot.init(this)
+				this.assertCurrentAttempt(attemptId)
+				const logicsConfig = await logics.init(this)
+				this.assertCurrentAttempt(attemptId)
+				const genericActionConfig = genericAction.init(this)
+				this.assertCurrentAttempt(attemptId)
+
+				this.setVariableDefinitions([
+					...varDefinitions,
+					...selectorConfig.variables,
+					...logicsConfig.variables,
+					...genericActionConfig.variables,
+				])
+
+				this.setFeedbackDefinitions({
+					...feedbackDefinitions,
+					...selectorConfig.feedback,
+					...logicsConfig.feedback,
 				})
-				.safeParse(err)
-
-			if (parserResult.success) {
-				const message = parserResult.data.error.message
-				this.updateStatus(InstanceStatus.ConnectionFailure, message)
-				return
-			}
-
-			// parse as websocket Event error
-			const parserResult2 = z
-				.object({
-					type: z.string(),
+				this.setActionDefinitions({
+					...actionDefinitions,
+					...selectorConfig.actions,
+					...snapshotConfig.actions,
+					...logicsConfig.actions,
+					...genericActionConfig.actions,
 				})
-				.safeParse(err)
 
-			if (parserResult2.success) {
-				const message = parserResult2.data.type
-				this.updateStatus(InstanceStatus.ConnectionFailure, message)
-				return
+				this.setPresetDefinitions({
+					...presetDefinitions,
+					...selectorConfig.presets,
+					...snapshotConfig.presets,
+					...logicsConfig.presets,
+				})
+
+				this.assertCurrentAttempt(attemptId)
+				this.updateStatus(InstanceStatus.Ok)
+			} catch (err) {
+				if (err instanceof StaleAttemptError) {
+					return
+				}
+				const detail = err instanceof Error ? err.message : String(err)
+				this.log('error', `Unexpected init error: ${detail}`)
 			}
-
-			this.updateStatus(InstanceStatus.ConnectionFailure, 'unknow error')
-			return
-		}
-
-		const varDefinitions: Array<CompanionVariableDefinition> = []
-		let feedbackDefinitions: CompanionFeedbackDefinitions = {}
-		let actionDefinitions: CompanionActionDefinitions = {}
-		let presetDefinitions: CompanionPresetDefinitions = {}
-
-		const channels = await fetchChannel(this).catch(() => null)
-		const pots = await fetchPots(this).catch(() => null)
-
-		if (channels) {
-			const channelOnOffConfig = channelOnOff.init(this, channels)
-			varDefinitions.push(...channelOnOffConfig.variables)
-			feedbackDefinitions = { ...feedbackDefinitions, ...channelOnOffConfig.feedback }
-			actionDefinitions = { ...actionDefinitions, ...channelOnOffConfig.actions }
-			presetDefinitions = { ...presetDefinitions, ...channelOnOffConfig.presets }
-
-			const faderLevelConfig = faderLevel.init(this, channels)
-			actionDefinitions = { ...actionDefinitions, ...faderLevelConfig.actions }
-			presetDefinitions = { ...presetDefinitions, ...faderLevelConfig.presets }
-
-			const faderGainAgainConfig = faderGainAgain.init(this, channels)
-			actionDefinitions = { ...actionDefinitions, ...faderGainAgainConfig.actions }
-			presetDefinitions = { ...presetDefinitions, ...faderGainAgainConfig.presets }
-
-			const faderPflConfig = faderPfl.init(this, channels)
-			varDefinitions.push(...faderPflConfig.variables)
-			feedbackDefinitions = { ...feedbackDefinitions, ...faderPflConfig.feedback }
-			actionDefinitions = { ...actionDefinitions, ...faderPflConfig.actions }
-			presetDefinitions = { ...presetDefinitions, ...faderPflConfig.presets }
-		}
-
-		if (pots && Object.keys(pots).length > 0) {
-			const potValueConfig = potValue.init(this, pots)
-			actionDefinitions = { ...actionDefinitions, ...potValueConfig.actions }
-			presetDefinitions = { ...presetDefinitions, ...potValueConfig.presets }
-		}
-
-		const selectorConfig = await selector.init(this)
-		const snapshotConfig = await snapshot.init(this)
-		const logicsConfig = await logics.init(this)
-		const genericActionConfig = genericAction.init(this)
-
-		this.setVariableDefinitions([
-			...varDefinitions,
-			...selectorConfig.variables,
-			...logicsConfig.variables,
-			...genericActionConfig.variables,
-		])
-
-		this.setFeedbackDefinitions({
-			...feedbackDefinitions,
-			...selectorConfig.feedback,
-			...logicsConfig.feedback,
-		})
-		this.setActionDefinitions({
-			...actionDefinitions,
-			...selectorConfig.actions,
-			...snapshotConfig.actions,
-			...logicsConfig.actions,
-			...genericActionConfig.actions,
-		})
-
-		this.setPresetDefinitions({
-			...presetDefinitions,
-			...selectorConfig.presets,
-			...snapshotConfig.presets,
-			...logicsConfig.presets,
-		})
-
-		this.updateStatus(InstanceStatus.Ok)
+		})()
 	}
 
 	onSubscriptionUpdate(update: ResponseSubscriptionUpdate): void {
@@ -176,12 +209,41 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	}
 
 	async destroy(): Promise<void> {
+		this.latestInitAttempt++
 		this.log('debug', 'destroy')
 	}
 
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
 		await this.init(config)
+	}
+
+	private isAttemptStale(attemptId: number): boolean {
+		return attemptId !== this.latestInitAttempt
+	}
+
+	private assertCurrentAttempt(attemptId: number): void {
+		if (this.isAttemptStale(attemptId)) {
+			throw new StaleAttemptError()
+		}
+	}
+
+	private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+		let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+		const timeoutPromise = new Promise<T>((_, reject) => {
+			timeoutHandle = setTimeout(() => {
+				reject(new Error(timeoutMessage))
+			}, timeoutMs)
+		})
+
+		try {
+			return await Promise.race([promise, timeoutPromise])
+		} finally {
+			if (timeoutHandle) {
+				clearTimeout(timeoutHandle)
+			}
+		}
 	}
 
 	getConfigFields(): SomeCompanionConfigField[] {

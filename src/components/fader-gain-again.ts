@@ -24,8 +24,8 @@ export function init(
 
 function genActions(self: ModuleInstance, ch: ChannelRecord): CompanionActionDefinitions {
 	return {
-		fader_gain_again_adjust: {
-			name: 'Fader Gain Again (Rotary)',
+		fader_again_adjust: {
+			name: 'Fader Again (Rotary)',
 			description: 'Adjust /audio/mixers/{mixerID}/faders/{faderID}/params/gain/again/',
 			options: [
 				{
@@ -90,10 +90,10 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 	return Object.entries(ch).reduce(
 		(acc, [key, values]) => ({
 			...acc,
-			[`fader-gain-again-${key}`]: {
+			[`fader-again-${key}`]: {
 				type: 'button',
 				category: `Fader: ${values.label}`,
-				name: `${key} Gain Rotary`,
+				name: `${key} Again Rotary`,
 				style: {
 					text: `${values.label}\nGain`,
 					size: '14',
@@ -109,7 +109,7 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 						up: [],
 						rotate_left: [
 							{
-								actionId: 'fader_gain_again_adjust',
+								actionId: 'fader_again_adjust',
 								options: {
 									faderId: key,
 									direction: 'down',
@@ -119,7 +119,7 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 						],
 						rotate_right: [
 							{
-								actionId: 'fader_gain_again_adjust',
+								actionId: 'fader_again_adjust',
 								options: {
 									faderId: key,
 									direction: 'up',

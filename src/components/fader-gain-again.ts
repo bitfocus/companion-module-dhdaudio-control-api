@@ -22,18 +22,24 @@ export function init(
 	return { actions, presets }
 }
 
+function getFadersWithAgain(ch: ChannelRecord): Array<[string, ChannelRecord[string]]> {
+	return Object.entries(ch).filter(([, values]) => values._hasagain === true)
+}
+
 function genActions(self: ModuleInstance, ch: ChannelRecord): CompanionActionDefinitions {
+	const fadersWithAgain = getFadersWithAgain(ch)
+
 	return {
 		fader_again_adjust: {
-			name: 'Fader Again (Rotary)',
+			name: 'Fader AGain (Rotary)',
 			description: 'Adjust /audio/mixers/{mixerID}/faders/{faderID}/params/gain/again/',
 			options: [
 				{
 					id: 'faderId',
 					type: 'dropdown',
 					label: 'Fader',
-					default: 0,
-					choices: Object.entries(ch).map(([id, values]) => ({ id, label: `${id} (${values.label})` })),
+					default: fadersWithAgain[0]?.[0] ?? '',
+					choices: fadersWithAgain.map(([id, values]) => ({ id, label: `${id} (${values.label})` })),
 				},
 				{
 					id: 'direction',
@@ -45,37 +51,22 @@ function genActions(self: ModuleInstance, ch: ChannelRecord): CompanionActionDef
 						{ id: 'down', label: 'Decrease' },
 					],
 				},
-				{
-					id: 'step',
-					type: 'number',
-					label: 'Step',
-					default: 1,
-					min: 0.01,
-					max: 20,
-					step: 0.01,
-					required: true,
-				},
 			],
 			callback: async ({ options }) => {
 				const faderId = `${options.faderId}`
 				const direction = options.direction === 'down' ? -1 : 1
-				const stepValue = z.coerce.number().safeParse(options.step)
-				if (!stepValue.success) {
-					self.updateStatus(InstanceStatus.BadConfig, 'Invalid step value')
-					return
-				}
 
 				const path = `/audio/mixers/0/faders/${faderId}/params/gain/again/`
-				const currentValue = await getNumericValue(self, path)
-				if (currentValue === null) {
+				const stepSize = await getNumericValue(self, `${path}_step/`)
+				if (stepSize === null) {
 					return
 				}
 
-				const nextValue = currentValue + direction * stepValue.data
+				const incValue = direction * stepSize
 
 				self.websocket.set(
-					path,
-					nextValue,
+					`${path}inc`,
+					incValue,
 					() => void 1,
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
@@ -87,15 +78,15 @@ function genActions(self: ModuleInstance, ch: ChannelRecord): CompanionActionDef
 }
 
 function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
-	return Object.entries(ch).reduce(
+	return getFadersWithAgain(ch).reduce(
 		(acc, [key, values]) => ({
 			...acc,
 			[`fader-again-${key}`]: {
 				type: 'button',
 				category: `Fader: ${values.label}`,
-				name: `${key} Again Rotary`,
+				name: `${key} AGain Rotary`,
 				style: {
-					text: `${values.label}\nGain`,
+					text: `${values.label}\n AGain`,
 					size: '14',
 					color: combineRgb(255, 255, 255),
 					bgcolor: 0,
@@ -113,7 +104,6 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 								options: {
 									faderId: key,
 									direction: 'down',
-									step: 1,
 								},
 							},
 						],
@@ -123,7 +113,6 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 								options: {
 									faderId: key,
 									direction: 'up',
-									step: 1,
 								},
 							},
 						],

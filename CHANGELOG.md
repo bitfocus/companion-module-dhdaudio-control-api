@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Pot support now only includes entries that provide `value`, `_min`, and `_max`, and pot rotary adjustments are clamped to each pot's configured minimum/maximum range.
+- Fader AGain rotary actions/presets now only appear for faders advertising `_hasagain`, and AGain adjustments now use the API-provided `again_step` increment via the `again/inc` path instead of writing absolute values.
 
 ### Fixed
 

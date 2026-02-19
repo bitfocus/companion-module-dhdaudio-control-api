@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-19
+
 ### Added
 
 - Added dedicated rotary actions and presets for fader gain trim (`/audio/mixers/{mixerID}/faders/{faderID}/params/gain/again/`) and pot values (`/audio/pots/{potID}/value`).

@@ -105,6 +105,15 @@ export async function init(self: ModuleInstance): Promise<{
 }> {
 	const [selectors, sourcelists] = await fetchSelectors(self)
 
+	if (Object.keys(selectors).length === 0 || Object.keys(sourcelists).length === 0) {
+		return {
+			actions: {},
+			presets: {},
+			variables: [],
+			feedback: {},
+		}
+	}
+
 	const sourcelistSelectorRefs = genSourcelistSelectorRefs(selectors)
 	const findSourceFromOptions = mkFindSourceFromOptions(self, sourcelists, sourcelistSelectorRefs)
 	const options = mkOptions(selectors, sourcelists, sourcelistSelectorRefs)

@@ -60,26 +60,57 @@ const ResponseError = z.object({
 	}),
 })
 
-const Response = z.union([ResponseSuccess, ResponseError])
+const WebsocketError = z.object({
+	error: z.object({
+		code: z.number(),
+		message: z.string(),
+	}),
+	path: z.string().optional(),
+})
 
 export async function fetchSelectors(self: ModuleInstance): Promise<[Selectors, Sourcelists]> {
 	return new Promise((resolve, reject) => {
-		self.websocket.get('/audio/selectors', (response) => {
-			// TODO: can `success` false here too? if so the control-api-ts typing need a correction
-			const parsed = z.parse(Response, response)
-			if (parsed.success) {
-				const { payload } = parsed
+		const onMissingSelectorEndpoint = () => {
+			self.log('warn', 'Selectors endpoint unavailable on this device; selector features disabled')
+			resolve([{}, {}])
+		}
 
-				// If no sourcelist is assigned, the entry will be "0".
-				const selectors = Object.fromEntries(
-					Object.entries(payload.selectors).filter(([_, { _sourcelist }]) => _sourcelist !== '0'),
-				)
+		self.websocket.get(
+			'/audio/selectors',
+			(response) => {
+				const successResponse = ResponseSuccess.safeParse(response)
+				if (successResponse.success) {
+					const { payload } = successResponse.data
 
-				return resolve([selectors, payload.sourcelists] as const)
-			}
+					// If no sourcelist is assigned, the entry will be "0".
+					const selectors = Object.fromEntries(
+						Object.entries(payload.selectors).filter(([_, { _sourcelist }]) => _sourcelist !== '0'),
+					)
 
-			console.error(parsed.error)
-			reject(new Error(parsed.error.message))
-		})
+					return resolve([selectors, payload.sourcelists] as const)
+				}
+
+				const errorResponse = ResponseError.safeParse(response)
+				if (!errorResponse.success) {
+					reject(errorResponse.error)
+					return
+				}
+
+				if (errorResponse.data.error.code === 1203 && errorResponse.data.path === '/audio/selectors') {
+					return onMissingSelectorEndpoint()
+				}
+
+				console.error(errorResponse.data.error)
+				reject(new Error(errorResponse.data.error.message))
+			},
+			(response) => {
+				const parsed = WebsocketError.safeParse(response)
+				if (parsed.success && parsed.data.error.code === 1203) {
+					return onMissingSelectorEndpoint()
+				}
+
+				reject(new Error(parsed.success ? parsed.data.error.message : 'Failed to fetch selectors'))
+			},
+		)
 	})
 }

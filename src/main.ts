@@ -74,6 +74,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 						CONNECTION_TIMEOUT_MS,
 						`Connection timeout after ${CONNECTION_TIMEOUT_MS / 1000}s`,
 					)
+
 					websocket = connectResult as WebsocketApiWithSubscription
 				} catch (err) {
 					this.assertCurrentAttempt(attemptId)
@@ -201,6 +202,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 				}
 				const detail = err instanceof Error ? err.message : String(err)
 				this.log('error', `Unexpected init error: ${detail}`)
+				this.updateStatus(InstanceStatus.UnknownError, detail)
 			}
 		})()
 	}

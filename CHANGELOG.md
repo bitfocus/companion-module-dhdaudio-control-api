@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added live AGain and pot value companion variables, feedback subscriptions, and subscription-update handlers so current rotary values stay synchronized in real time.
+- Updated AGain and pot rotary presets to include the current value in button text via internal variable tokens.
+
 ## [1.1.0] - 2026-02-19
 
 ### Added

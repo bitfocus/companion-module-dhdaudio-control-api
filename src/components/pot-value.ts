@@ -1,25 +1,79 @@
 import {
 	combineRgb,
-	type CompanionButtonPresetDefinition,
 	InstanceStatus,
 	type CompanionActionDefinitions,
+	type CompanionButtonPresetDefinition,
+	type CompanionFeedbackDefinitions,
 	type CompanionPresetDefinitions,
+	type CompanionVariableDefinition,
 } from '@companion-module/base'
 import * as z from 'zod'
 import type { PotRecord } from '../control-api/pots.js'
 import type { ModuleInstance } from '../main.js'
+import type { ResponseSubscriptionUpdate } from '@dhdaudio/control-api'
 
 export function init(
 	self: ModuleInstance,
 	pots: PotRecord,
 ): {
+	variables: ReadonlyArray<CompanionVariableDefinition>
+	feedback: CompanionFeedbackDefinitions
 	actions: CompanionActionDefinitions
 	presets: CompanionPresetDefinitions
 } {
+	const variables = genVariables(pots)
+	const feedback = genFeedbacks(self, pots)
 	const actions = genActions(self, pots)
 	const presets = genPresets(pots)
 
-	return { actions, presets }
+	return { variables, feedback, actions, presets }
+}
+
+function genVariables(pots: PotRecord): ReadonlyArray<CompanionVariableDefinition> {
+	return Object.entries(pots).map(
+		([key, value]) =>
+			({
+				name: `${value._name ?? key}`,
+				variableId: `pot_value_${key}`,
+			}) satisfies CompanionVariableDefinition,
+	)
+}
+
+function genFeedbacks(self: ModuleInstance, pots: PotRecord): CompanionFeedbackDefinitions {
+	return {
+		pot_value: {
+			name: 'Pot Value',
+			type: 'boolean',
+			defaultStyle: {},
+			options: [
+				{
+					id: 'potId',
+					type: 'dropdown',
+					label: 'Pot',
+					default: Object.keys(pots)[0] ?? '0',
+					choices: Object.entries(pots).map(([id, value]) => ({ id, label: `${id} (${value._name ?? id})` })),
+				},
+			],
+			callback: () => true,
+			subscribe: ({ options }) => {
+				const path = `/audio/pots/${options.potId}/value`
+				self.websocket.subscribe(path)
+				self.websocket.get(
+					path,
+					(response) => {
+						const parsed = parseNumericPayload(response.payload)
+						if (parsed !== null) {
+							self.setVariableValues({ [`pot_value_${options.potId}`]: parsed })
+							self.checkFeedbacks()
+						}
+					},
+					(response) => {
+						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
+					},
+				)
+			},
+		},
+	}
 }
 
 function genActions(self: ModuleInstance, pots: PotRecord): CompanionActionDefinitions {
@@ -85,7 +139,13 @@ function genActions(self: ModuleInstance, pots: PotRecord): CompanionActionDefin
 				self.websocket.set(
 					path,
 					nextValue,
-					() => void 1,
+					(response) => {
+						const parsed = parseNumericPayload(response.payload)
+						if (parsed !== null) {
+							self.setVariableValues({ [`pot_value_${potId}`]: parsed })
+							self.checkFeedbacks()
+						}
+					},
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
 					},
@@ -104,7 +164,7 @@ function genPresets(pots: PotRecord): CompanionPresetDefinitions {
 				category: 'Pots',
 				name: `${key} Rotary`,
 				style: {
-					text: `${value._name ?? key}\nPot`,
+					text: `${value._name ?? key}\n$(internal:pot_value_${key})`,
 					size: '14',
 					color: combineRgb(255, 255, 255),
 					bgcolor: 0,
@@ -138,7 +198,14 @@ function genPresets(pots: PotRecord): CompanionPresetDefinitions {
 						],
 					},
 				],
-				feedbacks: [],
+				feedbacks: [
+					{
+						feedbackId: 'pot_value',
+						options: {
+							potId: key,
+						},
+					},
+				],
 			} satisfies CompanionButtonPresetDefinition,
 		}),
 		{},
@@ -152,24 +219,32 @@ const numericValueParser = z.union([
 	}),
 ])
 
+function parseNumericPayload(payload: unknown): number | null {
+	const parsed = numericValueParser.safeParse(payload)
+	if (!parsed.success) {
+		return null
+	}
+
+	if (typeof parsed.data === 'number') {
+		return parsed.data
+	}
+
+	return parsed.data.value
+}
+
 async function getNumericValue(self: ModuleInstance, path: string): Promise<number | null> {
 	return new Promise((resolve) => {
 		self.websocket.get(
 			path,
 			(response) => {
-				const parsed = numericValueParser.safeParse(response.payload)
-				if (!parsed.success) {
+				const parsed = parseNumericPayload(response.payload)
+				if (parsed === null) {
 					self.updateStatus(InstanceStatus.UnknownError, `Unexpected payload at ${path}`)
 					resolve(null)
 					return
 				}
 
-				if (typeof parsed.data === 'number') {
-					resolve(parsed.data)
-					return
-				}
-
-				resolve(parsed.data.value)
+				resolve(parsed)
 			},
 			(response) => {
 				self.updateStatus(InstanceStatus.UnknownError, response.error.message)
@@ -177,4 +252,28 @@ async function getNumericValue(self: ModuleInstance, path: string): Promise<numb
 			},
 		)
 	})
+}
+
+const updateParser = z.object({
+	audio: z.object({
+		pots: z.record(
+			z.string(),
+			z.object({
+				value: numericValueParser,
+			}),
+		),
+	}),
+})
+
+export function onSubscriptionUpdate(self: ModuleInstance, { payload }: ResponseSubscriptionUpdate): void {
+	const parsed = updateParser.safeParse(payload)
+
+	if (parsed.success) {
+		Object.entries(parsed.data.audio.pots).forEach(([potId, { value }]) => {
+			const normalized = typeof value === 'number' ? value : value.value
+			self.setVariableValues({ [`pot_value_${potId}`]: normalized })
+		})
+
+		self.checkFeedbacks()
+	}
 }

@@ -135,6 +135,8 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 					presetDefinitions = { ...presetDefinitions, ...faderLevelConfig.presets }
 
 					const faderGainAgainConfig = faderGainAgain.init(this, channels)
+					varDefinitions.push(...faderGainAgainConfig.variables)
+					feedbackDefinitions = { ...feedbackDefinitions, ...faderGainAgainConfig.feedback }
 					actionDefinitions = { ...actionDefinitions, ...faderGainAgainConfig.actions }
 					presetDefinitions = { ...presetDefinitions, ...faderGainAgainConfig.presets }
 
@@ -147,6 +149,8 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 
 				if (pots && Object.keys(pots).length > 0) {
 					const potValueConfig = potValue.init(this, pots)
+					varDefinitions.push(...potValueConfig.variables)
+					feedbackDefinitions = { ...feedbackDefinitions, ...potValueConfig.feedback }
 					actionDefinitions = { ...actionDefinitions, ...potValueConfig.actions }
 					presetDefinitions = { ...presetDefinitions, ...potValueConfig.presets }
 				}
@@ -204,6 +208,8 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		channelOnOff.onSubscriptionUpdate(this, update)
 		selector.onSubscriptionUpdate(this, update)
 		faderPfl.onSubscriptionUpdate(this, update)
+		faderGainAgain.onSubscriptionUpdate(this, update)
+		potValue.onSubscriptionUpdate(this, update)
 		logics.onSubscriptionUpdate(this, update)
 		genericAction.onSubscriptionUpdate(this, update)
 	}

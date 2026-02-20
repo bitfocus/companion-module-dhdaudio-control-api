@@ -61,11 +61,13 @@ function genFeedbacks(self: ModuleInstance, pots: PotRecord): CompanionFeedbackD
 				self.websocket.get(
 					path,
 					(response) => {
-						const parsed = parseNumericPayload(response.payload)
-						if (parsed !== null) {
-							self.setVariableValues({ [`pot_value_${options.potId}`]: parsed })
-							self.checkFeedbacks()
+						const value = z.coerce.number().safeParse(response.payload)
+						if (!value.success) {
+							return
 						}
+
+						self.setVariableValues({ [`pot_value_${options.potId}`]: value.data })
+						self.checkFeedbacks()
 					},
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
@@ -125,27 +127,21 @@ function genActions(self: ModuleInstance, pots: PotRecord): CompanionActionDefin
 					return
 				}
 
-				const path = `/audio/pots/${potId}/value`
-				const currentValue = await getNumericValue(self, path)
-				if (currentValue === null) {
+				const currentValue = z.coerce.number().safeParse(self.getVariableValue(`pot_value_${potId}`))
+				if (!currentValue.success) {
+					self.updateStatus(InstanceStatus.UnknownError, 'Invalid variable value')
 					return
 				}
 
 				const minValue = Math.min(pot._min, pot._max)
 				const maxValue = Math.max(pot._min, pot._max)
-				const adjustedValue = currentValue + direction * stepValue.data
+				const adjustedValue = currentValue.data + direction * stepValue.data
 				const nextValue = Math.min(maxValue, Math.max(minValue, adjustedValue))
 
 				self.websocket.set(
-					path,
+					`/audio/pots/${potId}/value`,
 					nextValue,
-					(response) => {
-						const parsed = parseNumericPayload(response.payload)
-						if (parsed !== null) {
-							self.setVariableValues({ [`pot_value_${potId}`]: parsed })
-							self.checkFeedbacks()
-						}
-					},
+					() => void 1,
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
 					},
@@ -212,54 +208,12 @@ function genPresets(pots: PotRecord): CompanionPresetDefinitions {
 	)
 }
 
-const numericValueParser = z.union([
-	z.number(),
-	z.object({
-		value: z.number(),
-	}),
-])
-
-function parseNumericPayload(payload: unknown): number | null {
-	const parsed = numericValueParser.safeParse(payload)
-	if (!parsed.success) {
-		return null
-	}
-
-	if (typeof parsed.data === 'number') {
-		return parsed.data
-	}
-
-	return parsed.data.value
-}
-
-async function getNumericValue(self: ModuleInstance, path: string): Promise<number | null> {
-	return new Promise((resolve) => {
-		self.websocket.get(
-			path,
-			(response) => {
-				const parsed = parseNumericPayload(response.payload)
-				if (parsed === null) {
-					self.updateStatus(InstanceStatus.UnknownError, `Unexpected payload at ${path}`)
-					resolve(null)
-					return
-				}
-
-				resolve(parsed)
-			},
-			(response) => {
-				self.updateStatus(InstanceStatus.UnknownError, response.error.message)
-				resolve(null)
-			},
-		)
-	})
-}
-
 const updateParser = z.object({
 	audio: z.object({
 		pots: z.record(
 			z.string(),
 			z.object({
-				value: numericValueParser,
+				value: z.number(),
 			}),
 		),
 	}),
@@ -267,13 +221,13 @@ const updateParser = z.object({
 
 export function onSubscriptionUpdate(self: ModuleInstance, { payload }: ResponseSubscriptionUpdate): void {
 	const parsed = updateParser.safeParse(payload)
-
-	if (parsed.success) {
-		Object.entries(parsed.data.audio.pots).forEach(([potId, { value }]) => {
-			const normalized = typeof value === 'number' ? value : value.value
-			self.setVariableValues({ [`pot_value_${potId}`]: normalized })
-		})
-
-		self.checkFeedbacks()
+	if (!parsed.success) {
+		return
 	}
+
+	Object.entries(parsed.data.audio.pots).forEach(([potId, { value }]) => {
+		self.setVariableValues({ [`pot_value_${potId}`]: value })
+	})
+
+	self.checkFeedbacks()
 }

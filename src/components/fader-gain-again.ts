@@ -34,13 +34,24 @@ function getFadersWithAgain(ch: ChannelRecord): Array<[string, ChannelRecord[str
 }
 
 function genVariables(ch: ChannelRecord): ReadonlyArray<CompanionVariableDefinition> {
-	return getFadersWithAgain(ch).map(
-		([key, values]) =>
-			({
-				name: `${values.label}`,
-				variableId: `fader_again_value_${key}`,
-			}) satisfies CompanionVariableDefinition,
-	)
+	return getFadersWithAgain(ch).flatMap(([key, values]) => [
+		{
+			variableId: `fader_again_min_${key}`,
+			name: `Fader ${values.label} AGain Min`,
+		},
+		{
+			variableId: `fader_again_max_${key}`,
+			name: `Fader ${values.label} AGain Max`,
+		},
+		{
+			variableId: `fader_again_value_${key}`,
+			name: `Fader ${values.label} AGain Value`,
+		},
+		{
+			variableId: `fader_again_step_${key}`,
+			name: `Fader ${values.label} AGain Step`,
+		},
+	])
 }
 
 function genFeedbacks(self: ModuleInstance, ch: ChannelRecord): CompanionFeedbackDefinitions {
@@ -61,16 +72,36 @@ function genFeedbacks(self: ModuleInstance, ch: ChannelRecord): CompanionFeedbac
 			],
 			callback: () => true,
 			subscribe: ({ options }) => {
-				const path = `/audio/mixers/0/faders/${options.faderId}/params/gain/again/value`
-				self.websocket.subscribe(path)
+				const path = `/audio/mixers/0/faders/${options.faderId}/params/gain/again`
+
+				self.websocket.subscribe(`${path}/value`)
 				self.websocket.get(
 					path,
 					(response) => {
-						const parsed = parseNumericPayload(response.payload)
-						if (parsed !== null) {
-							self.setVariableValues({ [`fader_again_value_${options.faderId}`]: parsed })
-							self.checkFeedbacks()
+						const current = z
+							.object({
+								value: z.number(),
+								_max: z.number(),
+								_min: z.number(),
+								_step: z.number(),
+							})
+							.safeParse(response.payload)
+
+						if (!current.success) {
+							return
 						}
+
+						const faderId = `${options.faderId}`
+
+						const { _max, _min, _step, value } = current.data
+						self.setVariableValues({
+							[`fader_again_min_${faderId}`]: _min,
+							[`fader_again_max_${faderId}`]: _max,
+							[`fader_again_step_${faderId}`]: _step,
+							[`fader_again_value_${faderId}`]: value,
+						})
+
+						self.checkFeedbacks()
 					},
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
@@ -109,26 +140,37 @@ function genActions(self: ModuleInstance, ch: ChannelRecord): CompanionActionDef
 			],
 			callback: async ({ options }) => {
 				const faderId = `${options.faderId}`
-				const direction = options.direction === 'down' ? -1 : 1
+				const isDown = options.direction === 'down'
 
-				const path = `/audio/mixers/0/faders/${faderId}/params/gain/again/`
-				const stepSize = await getNumericValue(self, `${path}_step/`)
-				if (stepSize === null) {
+				const current = z
+					.object({
+						value: z.number(),
+						max: z.number(),
+						min: z.number(),
+						step: z.number(),
+					})
+					.safeParse({
+						value: self.getVariableValue(`fader_again_value_${faderId}`),
+						step: self.getVariableValue(`fader_again_step_${faderId}`),
+						min: self.getVariableValue(`fader_again_min_${faderId}`),
+						max: self.getVariableValue(`fader_again_max_${faderId}`),
+					})
+
+				if (!current.success) {
 					return
 				}
 
-				const incValue = direction * stepSize
+				const { max, min, step, value } = current.data
+				if ((isDown && value <= min) || (!isDown && value >= max)) {
+					return
+				}
+
+				const incrementValue = (isDown ? -1 : 1) * step
 
 				self.websocket.set(
-					`${path}inc`,
-					incValue,
-					(response) => {
-						const parsed = parseNumericPayload(response.payload)
-						if (parsed !== null) {
-							self.setVariableValues({ [`fader_again_value_${faderId}`]: parsed })
-							self.checkFeedbacks()
-						}
-					},
+					`/audio/mixers/0/faders/${faderId}/params/gain/again/inc`,
+					incrementValue,
+					() => void 1,
 					(response) => {
 						self.updateStatus(InstanceStatus.UnknownError, response.error.message)
 					},
@@ -193,94 +235,41 @@ function genPresets(ch: ChannelRecord): CompanionPresetDefinitions {
 	)
 }
 
-const numericValueParser = z.union([
-	z.number(),
-	z.object({
-		value: z.number(),
-	}),
-])
-
-function parseNumericPayload(payload: unknown): number | null {
-	const parsed = numericValueParser.safeParse(payload)
-	if (!parsed.success) {
-		return null
-	}
-
-	if (typeof parsed.data === 'number') {
-		return parsed.data
-	}
-
-	return parsed.data.value
-}
-
-async function getNumericValue(self: ModuleInstance, path: string): Promise<number | null> {
-	return new Promise((resolve) => {
-		self.websocket.get(
-			path,
-			(response) => {
-				const parsed = parseNumericPayload(response.payload)
-				if (parsed === null) {
-					self.updateStatus(InstanceStatus.UnknownError, `Unexpected payload at ${path}`)
-					resolve(null)
-					return
-				}
-
-				resolve(parsed)
-			},
-			(response) => {
-				self.updateStatus(InstanceStatus.UnknownError, response.error.message)
-				resolve(null)
-			},
-		)
-	})
-}
-
 const updateParser = z.object({
 	audio: z.object({
 		mixers: z.record(
 			z.string(),
 			z.object({
-				faders: z.record(z.string(), z.object({ params: z.unknown() })),
+				faders: z.record(
+					z.string(),
+					z.object({
+						params: z.object({
+							gain: z.object({
+								again: z.object({
+									value: z.number(),
+								}),
+							}),
+						}),
+					}),
+				),
 			}),
 		),
 	}),
 })
 
-const faderParamsParser = z
-	.object({
-		gain: z
-			.object({
-				again: z
-					.object({
-						value: numericValueParser,
-					})
-					.optional(),
-			})
-			.optional(),
-	})
-	.optional()
-
 export function onSubscriptionUpdate(self: ModuleInstance, { payload }: ResponseSubscriptionUpdate): void {
 	const parsed = updateParser.safeParse(payload)
-
-	if (parsed.success) {
-		Object.values(parsed.data.audio.mixers).forEach((mixer) => {
-			Object.entries(mixer.faders).forEach(([faderId, { params }]) => {
-				const paramsResult = faderParamsParser.safeParse(params)
-				if (!paramsResult.success) {
-					return
-				}
-
-				const nextValue = paramsResult.data?.gain?.again?.value
-				if (nextValue === undefined) {
-					return
-				}
-
-				const normalized = typeof nextValue === 'number' ? nextValue : nextValue.value
-				self.setVariableValues({ [`fader_again_value_${faderId}`]: normalized })
-			})
-		})
-
-		self.checkFeedbacks()
+	if (!parsed.success) {
+		return
 	}
+
+	Object.values(parsed.data.audio.mixers).forEach(({ faders }) =>
+		Object.entries(faders).forEach(([faderId, { params }]) => {
+			const nextValue = params.gain.again.value
+
+			self.setVariableValues({ [`fader_again_value_${faderId}`]: nextValue })
+		}),
+	)
+
+	self.checkFeedbacks()
 }

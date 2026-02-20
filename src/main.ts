@@ -65,7 +65,9 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 					if (config.token) {
 						control = control.withAuth({ token: config.token }, console.log, console.error)
 					}
-					control = control.withSubscription(this.onSubscriptionUpdate.bind(this)).withLogLevel('error')
+					control = control
+						.withSubscription(this.onSubscriptionUpdate.bind(this))
+						.withLogLevel(config.debug ? 'debug' : 'error')
 
 					const connectResult = await this.withTimeout(
 						control.connectAsync(),

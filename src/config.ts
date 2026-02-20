@@ -4,6 +4,7 @@ export interface ModuleConfig {
 	host: string
 	useHttps: boolean
 	token: string
+	debug: boolean
 	genericActionsNum: string
 }
 
@@ -38,6 +39,13 @@ export function genConfigFields(): SomeCompanionConfigField[] {
 			default: '10',
 			width: 12,
 			regex: Regex.NUMBER,
+		},
+		{
+			type: 'checkbox',
+			id: 'debug',
+			label: 'Debug logging',
+			default: false,
+			width: 12,
 		},
 	]
 }

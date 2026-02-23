@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Selector initialization now gracefully handles devices that do not expose `/audio/selectors` (Control API error `1203 invalid path`) by disabling selector features instead of failing module setup.
 - Selector endpoint request errors now resolve/reject correctly, and unexpected init failures now set an explicit module error status instead of leaving the module stuck in `Connecting`.
+- Selector fetch parsing now accepts partial `/audio/selectors` payloads and defaults missing `selectors`/`sourcelists` to empty maps, so selector setup no longer fails when devices omit those fields.
 
 ## [1.1.0] - 2026-02-19
 

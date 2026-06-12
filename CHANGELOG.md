@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a fader dropdown to the snapshot action (visible for channel snapshots) so channel snapshots load to a selectable fader; channel snapshot presets default to the first available fader. (#4, thanks @criskurtin)
+
+### Fixed
+
+- Channel snapshot loading now sends the selected fader as the `fader` RPC parameter; previously the mixer ID was sent as `fader` for all snapshot types, so channel snapshots could not target a fader.
+
 ## [1.2.0] - 2026-02-27
 
 ### Added

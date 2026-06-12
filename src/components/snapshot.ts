@@ -1,6 +1,7 @@
 import {
 	combineRgb,
 	type CompanionButtonPresetDefinition,
+	type CompanionOptionValues,
 	type CompanionPresetDefinitions,
 	type DropdownChoice,
 	InstanceStatus,
@@ -9,7 +10,7 @@ import {
 } from '@companion-module/base'
 import * as z from 'zod'
 import type { ModuleInstance } from '../main.js'
-import { ChannelRecord } from '../control-api/channel.js'
+import type { ChannelRecord } from '../control-api/channel.js'
 
 // https://developer.dhd.audio/docs/api/control-api/rpc/#getsnapshotlist
 const types = [
@@ -17,6 +18,9 @@ const types = [
 	[2, 'Mixer'],
 	[3, 'Processing'],
 ] as const
+
+// channel snapshots require a `fader` param on `loadsnapshot`
+const CHANNEL_SNAPSHOT_TYPE = types[0][0]
 
 export async function init(
 	self: ModuleInstance,
@@ -59,10 +63,12 @@ export async function init(
 		return acc
 	}, {})
 
-	const options = mkOptions(mixers, mixerSnapshotRefs, ch)
+	const defaultFaderId = Object.keys(ch)[0]
+
+	const options = mkOptions(mixers, mixerSnapshotRefs, ch, defaultFaderId)
 
 	const actions = genActions(self, options)
-	const presets = genPresets(mixerSnapshotRefs)
+	const presets = genPresets(mixerSnapshotRefs, defaultFaderId)
 
 	return { actions, presets }
 }
@@ -88,6 +94,7 @@ const mkOptions = (
 	mixers: Mixers,
 	refs: MixerSnapshotRefs,
 	ch: ChannelRecord,
+	defaultFaderId: string | undefined,
 ): Array<SomeCompanionActionInputField> => [
 	{
 		id: 'mixer',
@@ -98,11 +105,11 @@ const mkOptions = (
 	},
 	{
 		id: 'faderId',
-		type: 'dropdown',
+		type: 'dropdown' as const,
 		label: 'Fader',
-		default: 0,
+		default: defaultFaderId ?? '',
 		choices: Object.entries(ch).map(([id, values]) => ({ id, label: `${id} (${values.label})` })),
-		isVisibleExpression: '$(options:type) == 1',
+		isVisibleExpression: `$(options:type) == ${CHANNEL_SNAPSHOT_TYPE}`,
 	},
 	{
 		id: 'type',
@@ -156,16 +163,16 @@ function genActions(self: ModuleInstance, options: Array<SomeCompanionActionInpu
 					return
 				}
 
-				const loadSnapshotParams: any = {
+				const loadSnapshotParams: { type: number; mixer: number; id: string; fader?: number } = {
 					type: parseInt(type.toString()),
 					mixer: parseInt(mixer.toString()),
 					id: id.toString(),
 				}
 
-				if (type == 1) {
-					if (!faderId) {
-						self.log('error', 'faderId is missing')
-						self.updateStatus(InstanceStatus.BadConfig, 'options is missing')
+				if (loadSnapshotParams.type === CHANNEL_SNAPSHOT_TYPE) {
+					if (faderId == null || faderId === '') {
+						self.log('error', 'faderId option is missing')
+						self.updateStatus(InstanceStatus.BadConfig, 'faderId option is missing')
 						return
 					}
 
@@ -181,7 +188,7 @@ function genActions(self: ModuleInstance, options: Array<SomeCompanionActionInpu
 	}
 }
 
-function genPresets(refs: MixerSnapshotRefs): CompanionPresetDefinitions {
+function genPresets(refs: MixerSnapshotRefs, defaultFaderId: string | undefined): CompanionPresetDefinitions {
 	return Object.entries(refs).reduce(
 		(acc, [mixer, typeSnapshotsRef]) => ({
 			...acc,
@@ -189,14 +196,14 @@ function genPresets(refs: MixerSnapshotRefs): CompanionPresetDefinitions {
 				(acc, [type, snapshots]) => ({
 					...acc,
 					...snapshots.reduce((acc, { name, id }) => {
-						const options: any = {
+						const options: CompanionOptionValues = {
 							mixer,
 							type,
 							[`${mixer}-${type}`]: id,
 						}
 
-						if (parseInt(type) == 1) {
-							options.faderId = 0
+						if (parseInt(type) === CHANNEL_SNAPSHOT_TYPE && defaultFaderId !== undefined) {
+							options.faderId = defaultFaderId
 						}
 
 						return {

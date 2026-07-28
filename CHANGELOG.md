@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-28
+
 ### Added
 
 - Added a fader dropdown to the snapshot action (visible for channel snapshots) so channel snapshots load to a selectable fader; channel snapshot presets default to the first available fader. (#4, thanks @criskurtin)

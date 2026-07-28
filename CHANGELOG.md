@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Channel snapshot loading now sends the selected fader as the `fader` RPC parameter; previously the mixer ID was sent as `fader` for all snapshot types, so channel snapshots could not target a fader.
+- Pot and AGain rotary presets now declare an empty style for their subscription-only feedbacks, so Companion 5 no longer overrides the button text layer and hides the live values (existing buttons need the feedback re-added).
 
 ## [1.2.0] - 2026-02-27
 

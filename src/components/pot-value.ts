@@ -200,6 +200,11 @@ function genPresets(pots: PotRecord): CompanionPresetDefinitions {
 						options: {
 							potId: key,
 						},
+						// This feedback only exists to run its `subscribe` hook; it must not
+						// contribute any style. Without an explicit (empty) style here,
+						// Companion 5 generates placeholder style overrides for the preset that
+						// clobber the button's text layer, hiding $(…:pot_value_<id>).
+						style: {},
 					},
 				],
 			} satisfies CompanionButtonPresetDefinition,

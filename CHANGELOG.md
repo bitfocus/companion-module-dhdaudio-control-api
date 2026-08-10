@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-10
+
+Re-release of 1.3.1 with no functional changes. The `v1.3.1` tag was pushed against a commit that is not part of the main history, so it could not be used for the module submission.
+
 ## [1.3.1] - 2026-08-10
 
 ### Added

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-10
+
 ### Added
 
 - Added an upgrade script that sets the `faderId` option introduced in 1.3.0 to fader `0` on existing snapshot actions, so the option is never `undefined` for users upgrading from 1.2.0 or earlier.

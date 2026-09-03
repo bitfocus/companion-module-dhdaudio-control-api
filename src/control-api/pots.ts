@@ -40,35 +40,39 @@ const Response = z.union([ResponseSuccess, ResponseError])
 
 export async function fetchPots(self: ModuleInstance): Promise<PotRecord> {
 	return new Promise((resolve, reject) => {
-		self.websocket.get('/audio/pots', (response) => {
-			const result = Response.safeParse(response)
-			if (!result.success) {
-				return reject(new Error(result.error.message))
-			}
+		self.websocket.get(
+			'/audio/pots',
+			(response) => {
+				const result = Response.safeParse(response)
+				if (!result.success) {
+					return reject(new Error(result.error.message))
+				}
 
-			const parsedResponse = result.data
+				const parsedResponse = result.data
 
-			if (parsedResponse.success === false) {
-				return reject(new Error(parsedResponse.error.message))
-			}
+				if (parsedResponse.success === false) {
+					return reject(new Error(parsedResponse.error.message))
+				}
 
-			const directPayload = PotCandidateRecord.safeParse(parsedResponse.payload)
-			if (directPayload.success) {
-				return resolve(filterSupportedPots(directPayload.data))
-			}
+				const directPayload = PotCandidateRecord.safeParse(parsedResponse.payload)
+				if (directPayload.success) {
+					return resolve(filterSupportedPots(directPayload.data))
+				}
 
-			const nestedPayload = z
-				.object({
-					pots: PotCandidateRecord,
-				})
-				.safeParse(parsedResponse.payload)
+				const nestedPayload = z
+					.object({
+						pots: PotCandidateRecord,
+					})
+					.safeParse(parsedResponse.payload)
 
-			if (nestedPayload.success) {
-				return resolve(filterSupportedPots(nestedPayload.data.pots))
-			}
+				if (nestedPayload.success) {
+					return resolve(filterSupportedPots(nestedPayload.data.pots))
+				}
 
-			return reject(new Error('Invalid response payload for /audio/pots'))
-		})
+				return reject(new Error('Invalid response payload for /audio/pots'))
+			},
+			(error) => reject(new Error(error.error.message)),
+		)
 	})
 }
 

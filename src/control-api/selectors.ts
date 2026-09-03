@@ -11,7 +11,9 @@ type Source = z.infer<typeof Source>
 
 const Sourcelist = z.object({
 	_name: z.string(),
-	entries: z.record(z.string(), Source),
+	// XD3 configurations can contain source lists without an entries record.
+	// Keep the usable lists available instead of rejecting the complete response.
+	entries: z.record(z.string(), Source).catch({}),
 })
 
 const SourcelistId = z.string()
